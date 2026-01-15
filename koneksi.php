@@ -1,5 +1,6 @@
 <?php
-    $host     = 'localhost';
+    // Use 127.0.0.1 for better compatibility with CI/CD environments
+    $host     = '127.0.0.1';
     $user     = 'root'; 
     $password = 'n3wp4ssw0rd';                  
     $db       = 'quiz_pengupil';
