@@ -1,0 +1,87 @@
+name: CI Pipeline - Quiz Pengupil Testing
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: n3wp4ssw0rd
+          MYSQL_DATABASE: quiz_pengupil
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Set up PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        extensions: mysqli, pdo_mysql
+        coverage: none
+
+    - name: Wait for MySQL to be ready
+      run: |
+        until mysqladmin ping -h 127.0.0.1 -P 3306 -uroot -pn3wp4ssw0rd --silent; do
+          echo 'Waiting for MySQL...'
+          sleep 2
+        done
+
+    - name: Import database schema
+      run: |
+        mysql -h 127.0.0.1 -P 3306 -uroot -pn3wp4ssw0rd quiz_pengupil < db/quiz_pengupil.sql
+
+    - name: Verify database setup
+      run: |
+        mysql -h 127.0.0.1 -P 3306 -uroot -pn3wp4ssw0rd quiz_pengupil -e "SHOW TABLES;"
+
+    - name: Install Chrome for Selenium
+      uses: browser-actions/setup-chrome@v1
+      with:
+        chrome-version: stable
+
+    - name: Display Chrome version
+      run: chrome --version
+
+    - name: Run Register Tests
+      run: |
+        python -m pytest tests/test.py -v --tb=short
+
+    - name: Run Login Tests
+      run: |
+        python -m pytest tests/testlogin.py -v --tb=short
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: pytest-results
+        path: |
+          .pytest_cache/
+          tests/__pycache__/
